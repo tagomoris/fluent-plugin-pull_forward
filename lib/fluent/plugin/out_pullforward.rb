@@ -1,8 +1,13 @@
+require 'fluent/mixin/config_placeholders'
+
 module Fluent
   class PullForwardOutput < BufferedOutput
     DEFAULT_PULLFORWARD_LISTEN_PORT = 24280
 
     Fluent::Plugin.register_output('pullforward', self)
+
+    config_param :self_hostname, :string
+    include Fluent::Mixin::ConfigPlaceholders
 
     config_param :bind, :string, :default => '0.0.0.0'
     config_param :port, :integer, :default => DEFAULT_PULLFORWARD_LISTEN_PORT
@@ -17,7 +22,9 @@ module Fluent
     config_set_default :buffer_chunk_limit, 1024 * 1024 * 256 # 256MB
     config_set_default :buffer_queue_limit, 256
 
-    config_param :allow_self_signed_certificate, :bool, :default => true
+    config_param :cert_auto_generate, :bool, :default => false
+    config_param :generate_private_key_length, :integer, :default => 2048
+
     config_param :generate_cert_country, :string, :default => 'US'
     config_param :generate_cert_state, :string, :default => 'CA'
     config_param :generate_cert_locality, :string, :default => 'Mountain View'
@@ -56,14 +63,21 @@ module Fluent
     end
 
     def shutdown
-      @server.stop
+      @server.stop if @server
+      @thread.kill
       @thread.join
     end
 
     def certificate
       return @cert, @key if @cert && @key
 
+      if ! @cert_auto_generate and ! @cert_file_path
+        raise Fluent::ConfigError, "Both of cert_auto_generate and cert_file_path are not specified. See README."
+      end
+
       if @cert_auto_generate
+        @generate_cert_common_name ||= @self_hostname
+
         key = OpenSSL::PKey::RSA.generate(@generate_private_key_length)
 
         digest = OpenSSL::Digest::SHA1.new
@@ -103,23 +117,29 @@ module Fluent
 
     def run
       cert, key = self.certificate
-
-      @server = WEBrick::HTTPServer.new(
-        :BindAddress => @bind,
-        :Port => @port,
-        # :DocumentRoot => '.',
-        :SSLEnable  => true,
-        :SSLCertificate => cert,
-        :SSLPrivateKey => key
-      )
-
       realm = "Fluentd fluent-plugin-pullforward server"
 
       auth_db = HtpasswdDummy.new
       @users.each do |user|
         auth_db.set_passwd(realm, user.username, user.password)
       end
-      authenticator = HTTPAuth::BasicAuth.new(:UserDB => auth_db, :Realm => realm)
+      authenticator = WEBrick::HTTPAuth::BasicAuth.new(
+        :UserDB => auth_db,
+        :Realm => realm,
+        :Logger => WEBrick::Log.new(nil, WEBrick::BasicLog::FATAL),
+      )
+
+      @server = WEBrick::HTTPServer.new(
+        :BindAddress => @bind,
+        :Port => @port,
+        # :DocumentRoot => '.',
+        :Logger => WEBrick::Log.new(nil, WEBrick::BasicLog::WARN),
+        :AccessLog => [],
+        :SSLEnable  => true,
+        :SSLCertificate => cert,
+        :SSLPrivateKey => key
+      )
+      @server.logger.info("hogepos")
 
       @server.mount_proc('/') do |req, res|
         unless req.ssl?
@@ -143,7 +163,7 @@ module Fluent
     def dequeue_chunks
       response = []
 
-      unpacker = Messagepack::Unpacker.new
+      unpacker = MessagePack::Unpacker.new
 
       @buffer.pull_chunks do |chunk|
         next if chunk.empty?
