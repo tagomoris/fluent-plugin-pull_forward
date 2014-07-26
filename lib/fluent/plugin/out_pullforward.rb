@@ -24,6 +24,8 @@ module Fluent
     config_set_default :buffer_queue_limit, 256
 
     include Fluent::Mixin::Certificate
+    # REQUIRED: self_hostname
+    # REQUIRED: 'cert_auto_generate yes' or 'cert_file_path PATH'
 
     config_section :user, param_name: :users do
       config_param :username, :string
