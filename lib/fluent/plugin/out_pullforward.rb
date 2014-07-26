@@ -1,4 +1,5 @@
 require 'fluent/mixin/config_placeholders'
+require 'fluent/mixin/certificate'
 
 module Fluent
   class PullForwardOutput < BufferedOutput
@@ -22,17 +23,7 @@ module Fluent
     config_set_default :buffer_chunk_limit, 1024 * 1024 * 256 # 256MB
     config_set_default :buffer_queue_limit, 256
 
-    config_param :cert_auto_generate, :bool, :default => false
-    config_param :generate_private_key_length, :integer, :default => 2048
-
-    config_param :generate_cert_country, :string, :default => 'US'
-    config_param :generate_cert_state, :string, :default => 'CA'
-    config_param :generate_cert_locality, :string, :default => 'Mountain View'
-    config_param :generate_cert_common_name, :string, :default => nil
-
-    config_param :cert_file_path, :string, :default => nil
-    config_param :private_key_file, :string, :default => nil
-    config_param :private_key_passphrase, :string, :default => nil
+    include Fluent::Mixin::Certificate
 
     config_section :user, param_name: :users do
       config_param :username, :string
@@ -41,7 +32,6 @@ module Fluent
 
     def initialize
       super
-      require 'socket'
       require 'webrick'
       require 'webrick/https'
     end
@@ -66,43 +56,6 @@ module Fluent
       @server.stop if @server
       @thread.kill
       @thread.join
-    end
-
-    def certificate
-      return @cert, @key if @cert && @key
-
-      if ! @cert_auto_generate and ! @cert_file_path
-        raise Fluent::ConfigError, "Both of cert_auto_generate and cert_file_path are not specified. See README."
-      end
-
-      if @cert_auto_generate
-        @generate_cert_common_name ||= @self_hostname
-
-        key = OpenSSL::PKey::RSA.generate(@generate_private_key_length)
-
-        digest = OpenSSL::Digest::SHA1.new
-        issuer = subject = OpenSSL::X509::Name.new
-        subject.add_entry('C', @generate_cert_country)
-        subject.add_entry('ST', @generate_cert_state)
-        subject.add_entry('L', @generate_cert_locality)
-        subject.add_entry('CN', @generate_cert_common_name)
-
-        cer = OpenSSL::X509::Certificate.new
-        cer.not_before = Time.at(0)
-        cer.not_after = Time.at(0)
-        cer.public_key = key
-        cer.serial = 1
-        cer.issuer = issuer
-        cer.subject  = subject
-        cer.sign(key, digest)
-
-        @cert = cer
-        @key = key
-        return @cert, @key
-      end
-
-      @cert = OpenSSL::X509::Certificate.new(File.read(@cert_file_path))
-      @key = OpenSSL::PKey::RSA.new(File.read(@private_key_file), @private_key_passphrase)
     end
 
     class HtpasswdDummy < WEBrick::HTTPAuth::Htpasswd
@@ -153,6 +106,7 @@ module Fluent
         res.body = dequeue_chunks()
       end
 
+      log.info "listening pullforward socket on #{@bind}:#{@port}"
       @server.start
     end
 
