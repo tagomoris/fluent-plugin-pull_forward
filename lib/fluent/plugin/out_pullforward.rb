@@ -14,13 +14,13 @@ module Fluent
     config_param :port, :integer, :default => DEFAULT_PULLFORWARD_LISTEN_PORT
 
     config_set_default :buffer_type, 'pullpool'
-    config_set_default :flush_interval, 3600
+    config_set_default :flush_interval, 3600 # 1h
 
     # REQUIRED: buffer_path
 
     # same with TimeSlicedOutput + FileBuffer
-    # 256MB * 256 -> 64GB
-    config_set_default :buffer_chunk_limit, 1024 * 1024 * 256 # 256MB
+    # 16MB * 256 -> 4096MB
+    config_set_default :buffer_chunk_limit, 1024 * 1024 * 16 # 16MB
     config_set_default :buffer_queue_limit, 256
 
     include Fluent::Mixin::Certificate
