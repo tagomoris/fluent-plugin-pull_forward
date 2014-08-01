@@ -3,6 +3,8 @@ require 'fluent/mixin/certificate'
 require 'webrick'
 require 'webrick/https'
 
+require_relative 'webrick_logger_bridge'
+
 module Fluent
   class PullForwardOutput < BufferedOutput
     DEFAULT_PULLFORWARD_LISTEN_PORT = 24280
@@ -14,6 +16,9 @@ module Fluent
 
     config_param :bind, :string, :default => '0.0.0.0'
     config_param :port, :integer, :default => DEFAULT_PULLFORWARD_LISTEN_PORT
+
+    config_param :server_loglevel, :string, :default => 'WARN'
+    config_param :auth_loglevel, :string, :default => 'FATAL'
 
     config_set_default :buffer_type, 'pullpool'
     config_set_default :flush_interval, 3600 # 1h
@@ -74,6 +79,12 @@ module Fluent
       cert, key = self.certificate
       realm = "Fluentd fluent-plugin-pullforward server"
 
+      logger = $log
+      auth_logger = Fluent::PluginLogger.new(logger)
+      auth_logger.level = @auth_loglevel
+      server_logger = Fluent::PluginLogger.new(logger)
+      server_logger.level = @server_loglevel
+
       auth_db = HtpasswdDummy.new
       @users.each do |user|
         auth_db.set_passwd(realm, user.username, user.password)
@@ -81,14 +92,14 @@ module Fluent
       authenticator = WEBrick::HTTPAuth::BasicAuth.new(
         :UserDB => auth_db,
         :Realm => realm,
-        :Logger => WEBrick::Log.new(nil, WEBrick::BasicLog::FATAL),
+        :Logger => Fluent::PullForward::WEBrickLogger.new(auth_logger),
       )
 
       @server = WEBrick::HTTPServer.new(
         :BindAddress => @bind,
         :Port => @port,
         # :DocumentRoot => '.',
-        :Logger => WEBrick::Log.new(nil, WEBrick::BasicLog::WARN),
+        :Logger => Fluent::PullForward::WEBrickLogger.new(server_logger),
         :AccessLog => [],
         :SSLEnable  => true,
         :SSLCertificate => cert,
