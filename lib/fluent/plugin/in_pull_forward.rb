@@ -56,14 +56,18 @@ module Fluent
     end
 
     def fetcher
+      next_fetch = Time.now
       while @running
-        @servers.each do |server|
-          if @running
-            fetch(server)
+        if Time.now >= next_fetch
+          @servers.each do |server|
+            if @running
+              fetch(server)
+            end
           end
+          next_fetch = Time.now + @fetch_interval
         end
         break unless @running
-        sleep @fetch_interval
+        sleep 1
       end
     end
 
