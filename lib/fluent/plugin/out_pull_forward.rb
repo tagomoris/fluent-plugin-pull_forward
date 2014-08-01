@@ -1,11 +1,13 @@
 require 'fluent/mixin/config_placeholders'
 require 'fluent/mixin/certificate'
+require 'webrick'
+require 'webrick/https'
 
 module Fluent
   class PullForwardOutput < BufferedOutput
     DEFAULT_PULLFORWARD_LISTEN_PORT = 24280
 
-    Fluent::Plugin.register_output('pullforward', self)
+    Fluent::Plugin.register_output('pull_forward', self)
 
     config_param :self_hostname, :string
     include Fluent::Mixin::ConfigPlaceholders
@@ -34,8 +36,6 @@ module Fluent
 
     def initialize
       super
-      require 'webrick'
-      require 'webrick/https'
     end
 
     unless method_defined?(:log)
