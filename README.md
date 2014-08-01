@@ -19,6 +19,9 @@ Configure output plugin to transfer fluentd events to another fluentd nodes.
 <match dummy>
   type pull_forward
   
+  bind 0.0.0.0 ## default
+  port 24280   ## default
+  
   buffer_path    /home/myname/tmp/fluentd_event.buffer
   flush_interval 1m   ## default 1h
   
@@ -55,6 +58,7 @@ Configure input plugin to fetch fluentd events from another fluentd nodes.
   
   <server>
     host host1.on.internet.example.com
+    port 24280 ## default
     username tagomoris
     password foobar
   </server>
