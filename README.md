@@ -1,29 +1,92 @@
-# Fluent::Plugin::Pullforward
+# fluent-plugin-pull_forward
 
-TODO: Write a gem description
+[Fluentd](http://fluentd.org) input/output plugin to forward data, by pulling/request-based transportation, over HTTPS.
 
-## Installation
+We can do with pull_forward:
+* transfer data into hosts in firewall by pulling
+* protect transferring route by HTTPS and basic authentication
+* fetch Fluentd events as JSON by HTTPS from any processes
 
-Add this line to your application's Gemfile:
+![plugin image](https://raw.githubusercontent.com/tagomoris/fluent-plugin-pull_forward/master/misc/plugin_image.png)
 
-    gem 'fluent-plugin-pullforward'
+## Configuration
 
-And then execute:
+### PullForwardOutput
 
-    $ bundle
+Configure output plugin to transfer fluentd events to another fluentd nodes.
 
-Or install it yourself as:
+```apache
+<match dummy>
+  type pull_forward
+  
+  buffer_path    /home/myname/tmp/fluentd_event.buffer
+  flush_interval 1m   ## default 1h
+  
+  self_hostname      ${hostname}
+  cert_auto_generate yes
+  # or
+  # "cert_file_path PATH", "private_key_path PATH" and "private_key_passphrase ..."
+  
+  <user>
+    username tagomoris
+    password foobar
+  </user>
+  <user>
+    username repeatedly
+    password booo
+  </user>
+</match>
+```
 
-    $ gem install fluent-plugin-pullforward
+PullForwardOutput uses PullPoolBuffer plugin. **DO NOT MODIFY buffer_type**. It uses buffer file, so `buffer_path` is required, and Not so short values are welcome for `flush_interval` because PullPoolBuffer make a file per flushes (and these are not removed until fetches of cluent/in\_pull\_forward).
 
-## Usage
+PullForward always requires SSL and basic authentication. SSL options and `<user>` sections are also required.
 
-TODO: Write usage instructions here
+### PullForwardInput
 
-## Contributing
+Configure input plugin to fetch fluentd events from another fluentd nodes.
 
-1. Fork it ( https://github.com/[my-github-username]/fluent-plugin-pullforward/fork )
-2. Create your feature branch (`git checkout -b my-new-feature`)
-3. Commit your changes (`git commit -am 'Add some feature'`)
-4. Push to the branch (`git push origin my-new-feature`)
-5. Create a new Pull Request
+```apache
+<source>
+  type pull_forward
+  
+  fetch_interval 10s
+  timeout 10s
+  
+  <server>
+    host host1.on.internet.example.com
+    username tagomoris
+    password foobar
+  </server>
+  <server>
+    host host2.on.internet.example.com
+    username tagomoris
+    password foobar
+  </server>
+</source>
+```
+
+PullForwardInput can fetch events from many nodes of `<server>`.
+
+### HTTPS fetch
+
+We can fluentd events from PullForwardOutput by normal HTTPS.
+
+```
+$ curl -k -s --user tagomoris:foobar https://localhost:24280/
+[
+  [ "test.foo", 1406915165, { "pos": 8, "hoge": 1 } ],
+  [ "test.foo", 1406915168, { "pos": 9, "hoge": 1 } ],
+  [ "test.foo", 1406915173, { "pos": 0, "hoge": 0 } ]
+]
+```
+
+## TODO
+
+* TESTS!
+
+## Copyright
+
+* Copyright (c) 2014- TAGOMORI Satoshi (tagomoris)
+* License
+  * Apache License, Version 2.0
