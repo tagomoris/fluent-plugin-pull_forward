@@ -69,24 +69,28 @@ module Fluent
 
     def fetch(server)
       body = nil
+
       begin
         address = @resolver.getaddress(server.host)
-        Net::HTTP.start(address, server.port) do |https|
-          https.use_ssl = true
-          https.verify_mode = @verify_mode
-          req = Net::HTTP::Get.new('/')
-          req.basic_auth server.username, server.password
+        https = Net::HTTP.new(address, server.port)
+        https.open_timeout = @timeout
+        https.read_timeout = @timeout
+        https.use_ssl = true
+        https.verify_mode = @verify_mode
 
-          response = https.request(req)
-          body = response.body
+        req = Net::HTTP::Get.new('/')
+        req.basic_auth server.username, server.password
+
+        res = https.start{ https.request(req) }
+        if res && res.is_a?(Net::HTTPSuccess)
+          body = res.body
+        else
+          log.warn "failed to GET from Fluentd PullForward: #{server.host}, #{address}:#{server.port}, by #{res.class}"
         end
       rescue IOError, EOFError, SystemCallError => e
         log.warn "net/http GET raised an exception: #{e.class}, '#{e.message}'"
       end
-      unless res && res.is_a?(Net::HTTPSuccess)
-        log.warn "failed to GET from Fluentd PullForward: #{server.host}, #{address}:#{server.port}"
-        return
-      end
+      return unless body
 
       data = nil
       begin

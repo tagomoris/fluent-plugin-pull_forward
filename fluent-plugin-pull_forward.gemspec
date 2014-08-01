@@ -17,9 +17,10 @@ Gem::Specification.new do |spec|
 
   spec.add_development_dependency "bundler", "~> 1.6"
   spec.add_development_dependency "rake"
+
   spec.add_runtime_dependency "fluentd"
   spec.add_runtime_dependency "fluent-plugin-buffer-pullpool"
   spec.add_runtime_dependency "fluent-mixin-config-placeholders"
   spec.add_runtime_dependency "fluent-mixin-certificate"
-
+  spec.add_runtime_dependency "resolve-hostname", ">= 0.0.4"
 end
