@@ -2,7 +2,7 @@
 
 Gem::Specification.new do |spec|
   spec.name          = "fluent-plugin-pull_forward"
-  spec.version       = "0.0.1"
+  spec.version       = "0.0.2"
   spec.authors       = ["TAGOMORI Satoshi"]
   spec.email         = ["tagomoris@gmail.com"]
   spec.summary       = %q{Fluentd plugin to forward data, by pulling from input plugin}
@@ -20,7 +20,7 @@ Gem::Specification.new do |spec|
 
   spec.add_runtime_dependency "fluentd"
   spec.add_runtime_dependency "fluent-plugin-buffer-pullpool"
-  spec.add_runtime_dependency "fluent-mixin-config-placeholders"
+  spec.add_runtime_dependency "fluent-mixin-config-placeholders", ">= 0.3.0"
   spec.add_runtime_dependency "fluent-mixin-certificate"
   spec.add_runtime_dependency "resolve-hostname", ">= 0.0.4"
 end
